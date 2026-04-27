@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Mic, PhoneOff } from "lucide-react";
-import { session } from "@/agent";
+import { weatherAgent } from "@/agent";
+import { RealtimeAgent, RealtimeSession } from "@openai/agents-realtime";
+
 
 interface VoiceCallButtonProps {
   sessionApiKey: string;
@@ -12,27 +14,116 @@ export function VoiceCallButton({ sessionApiKey }: VoiceCallButtonProps) {
   const [inCall, setInCall] = useState(false);
 
   const toggleCall = async () => {
-    // if (inCall) {
-    //   session.close();
-    // } else {
-    //   await session.connect({ apiKey: sessionApiKey });
+    console.log("🚨 toggleCall called", Date.now());
+    
+  try {
+    const minimalAgent = new RealtimeAgent({
+  name: "test",
+  instructions: "Just respond briefly.",
+  tools: [],
+});
+    const session = new RealtimeSession(minimalAgent, { 
+      model: "gpt-realtime-1.5",
+      config: {
+    outputModalities: ['audio'],
+    audio: {
+      input: {
+        format: 'pcm16',
+        transcription: {
+          model: 'gpt-4o-mini-transcribe',
+        },
+      },
+      output: {
+        format: 'pcm16',
+      },
+    }}
+    });
+    
+    console.log("🧠 session created", session);
+
+    console.log("before connect", session);
+
+    if (inCall) {
+      session.close();
+      setInCall(false);
+      return;
+    } 
+    console.log("session instance:", session);
+
+    const transport = (session as any).transport;
+
+    console.log("pc:", transport?._pc);
+    console.log("has datachannel:", transport?._dataChannel !== undefined);
+    console.log("senders:", transport?._pc?.getSenders());
+    console.log("datachannels:", transport?._pc?.sctp);
+    // const pc = transport.peerConnection;
+    // console.log(pc);
+
+    // if (pc) {
+    //   pc.onconnectionstatechange = () => {
+    //     console.log("connectionState:", pc.connectionState);
+    //   };
+
+    //   pc.onsignalingstatechange = () => {
+    //     console.log("signalingState:", pc.signalingState);
+    //   };
+
+    //   pc.oniceconnectionstatechange = () => {
+    //     console.log("iceConnectionState:", pc.iceConnectionState);
+    //   };
     // }
-    // setInCall(!inCall);
-  if (inCall) {
-    session.close();
-    setInCall(false);
-    return;
+
+    const res = await fetch("/api/session", { method: "POST" });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("API error:", text);
+      throw new Error("API failed");
+    }
+
+    const data = await res.json();
+
+    console.log(data);
+    // console.log("before connect");
+
+    // await session.connect({
+    //   apiKey: data.clientSecret,
+    // });
+
+    // console.log("after connect");
+    console.log("before connect");
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    console.log(stream.getAudioTracks());
+    console.log(stream.active);
+    console.log("mic OK");
+
+    const p = session.connect({
+      apiKey: data.clientSecret,
+      model: "gpt-realtime-1.5",
+    });
+
+    console.log("connect returned", p);
+
+    // console.log((session as any)["#transport"]?.state);
+
+    // console.log((session as any)["#transport"]?.state);
+    // console.log((session as any)["#transport"]?.connectPromise);
+
+//     console.log(session);
+// console.log((session as any)["#transport"]);
+// console.log((session as any)["#eventEmitter"]);
+
+    console.log("connect returned promise");
+
+    await p;
+
+    console.log("after connect", session);
+
+    setInCall(true);
+  } catch (err) {
+    console.error("toggleCall error:", err);
   }
-
-  // ★ここで毎回新しいセッション取得
-  const res = await fetch("/api/session", { method: "POST" });
-  const data = await res.json();
-
-  await session.connect({
-    apiKey: data.clientSecret,
-  });
-
-  setInCall(true);
 };
 
   return (
