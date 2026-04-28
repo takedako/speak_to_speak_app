@@ -15,20 +15,3 @@ export const weatherAgent = new RealtimeAgent({
   instructions: 'Answer weather questions.',
   tools: [getWeather],
 });
-
-// export const agent = new RealtimeAgent({
-//   name: "Assistant",
-//   instructions: "You are a helpful assistant.",
-// });
-
-// const session = new RealtimeSession(agent, {
-//   model: "gpt-4o-realtime-preview-2025-06-03",
-// });
-
-// (session as any).on?.("error", (e: any) => {
-//   console.error("SESSION ERROR:", e);
-// });
-
-// (session as any).on?.("close", () => {
-//   console.log("SESSION CLOSED");
-// });

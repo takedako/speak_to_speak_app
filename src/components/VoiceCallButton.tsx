@@ -1,129 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Mic, PhoneOff } from "lucide-react";
 import { weatherAgent } from "@/agent";
-import { RealtimeAgent, RealtimeSession } from "@openai/agents-realtime";
+import { RealtimeSession } from "@openai/agents-realtime";
 
 
-interface VoiceCallButtonProps {
-  sessionApiKey: string;
-}
+// interface VoiceCallButtonProps {
+//   sessionApiKey: string;
+// }
 
-export function VoiceCallButton({ sessionApiKey }: VoiceCallButtonProps) {
+export function VoiceCallButton() {
   const [inCall, setInCall] = useState(false);
+  const sessionRef = useRef<RealtimeSession | null>(null);
 
-  const toggleCall = async () => {
-    console.log("🚨 toggleCall called", Date.now());
-    
-  try {
-    const minimalAgent = new RealtimeAgent({
-  name: "test",
-  instructions: "Just respond briefly.",
-  tools: [],
-});
-    const session = new RealtimeSession(minimalAgent, { 
-      model: "gpt-realtime-1.5",
-      config: {
-    outputModalities: ['audio'],
-    audio: {
-      input: {
-        format: 'pcm16',
-        transcription: {
-          model: 'gpt-4o-mini-transcribe',
-        },
-      },
-      output: {
-        format: 'pcm16',
-      },
-    }}
-    });
-    
-    console.log("🧠 session created", session);
 
-    console.log("before connect", session);
+  const toggleCall = async () => {    
+    try {
+      // 通話終了
+      if (inCall) {
+        if (sessionRef.current) {
+          sessionRef.current.interrupt();
+          sessionRef.current = null; // 後片付け
+        }
+        setInCall(false);
+        return;
+      }
 
-    if (inCall) {
-      session.close();
-      setInCall(false);
-      return;
-    } 
-    console.log("session instance:", session);
+      // const minimalAgent = new RealtimeAgent({
+      //   name: "test",
+      //   instructions: "Just respond briefly.",
+      //   tools: [],
+      // });
+      const session = new RealtimeSession(weatherAgent, { 
+          model: "gpt-realtime-1.5",
+      });
 
-    const transport = (session as any).transport;
+        console.log("session instance:", session);
 
-    console.log("pc:", transport?._pc);
-    console.log("has datachannel:", transport?._dataChannel !== undefined);
-    console.log("senders:", transport?._pc?.getSenders());
-    console.log("datachannels:", transport?._pc?.sctp);
-    // const pc = transport.peerConnection;
-    // console.log(pc);
+        const res = await fetch("/api/session", { method: "POST" });
 
-    // if (pc) {
-    //   pc.onconnectionstatechange = () => {
-    //     console.log("connectionState:", pc.connectionState);
-    //   };
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("API error:", text);
+          throw new Error("API failed");
+        }
 
-    //   pc.onsignalingstatechange = () => {
-    //     console.log("signalingState:", pc.signalingState);
-    //   };
+        const data = await res.json();
 
-    //   pc.oniceconnectionstatechange = () => {
-    //     console.log("iceConnectionState:", pc.iceConnectionState);
-    //   };
-    // }
+        await session.connect({
+          apiKey: data.clientSecret,
+          model: "gpt-realtime-1.5",
+        });
 
-    const res = await fetch("/api/session", { method: "POST" });
+        console.log("connect returned promise");
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("API error:", text);
-      throw new Error("API failed");
+        sessionRef.current = session;
+        setInCall(true);
+      
+    } catch (err) {
+      console.error("toggleCall error:", err);
     }
-
-    const data = await res.json();
-
-    console.log(data);
-    // console.log("before connect");
-
-    // await session.connect({
-    //   apiKey: data.clientSecret,
-    // });
-
-    // console.log("after connect");
-    console.log("before connect");
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    console.log(stream.getAudioTracks());
-    console.log(stream.active);
-    console.log("mic OK");
-
-    const p = session.connect({
-      apiKey: data.clientSecret,
-      model: "gpt-realtime-1.5",
-    });
-
-    console.log("connect returned", p);
-
-    // console.log((session as any)["#transport"]?.state);
-
-    // console.log((session as any)["#transport"]?.state);
-    // console.log((session as any)["#transport"]?.connectPromise);
-
-//     console.log(session);
-// console.log((session as any)["#transport"]);
-// console.log((session as any)["#eventEmitter"]);
-
-    console.log("connect returned promise");
-
-    await p;
-
-    console.log("after connect", session);
-
-    setInCall(true);
-  } catch (err) {
-    console.error("toggleCall error:", err);
-  }
 };
 
   return (
@@ -143,3 +80,145 @@ export function VoiceCallButton({ sessionApiKey }: VoiceCallButtonProps) {
     </button>
   );
 }
+// "use client";
+// import { useState, useRef } from "react";
+// import { Mic, PhoneOff } from "lucide-react";
+
+// export function VoiceCallButton() {
+//   const [inCall, setInCall] = useState(false);
+//   const pcRef = useRef<RTCPeerConnection | null>(null);
+//   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+//   const startCall = async () => {
+//     try {
+//       // 1. ephemeral key を取得
+//       const res = await fetch("/api/session", { method: "POST" });
+//       if (!res.ok) throw new Error("API failed");
+//       const data = await res.json();
+//       const ephemeralKey = data.clientSecret;
+
+//       // 2. RTCPeerConnection を作成
+//       // const pc = new RTCPeerConnection();
+//       const pc = new RTCPeerConnection({
+//         iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+//         iceTransportPolicy: "all",
+//       });
+//       pcRef.current = pc;
+
+//       // ICE接続状態の監視
+//       pc.oniceconnectionstatechange = () => {
+//         console.log("ICE state:", pc.iceConnectionState);
+//       };
+
+//       pc.onicecandidate = (e) => {
+//         console.log("ICE candidate:", e.candidate);
+//       };
+
+//       pc.onconnectionstatechange = () => {
+//         console.log("Connection state:", pc.connectionState);
+//       };
+
+//       pc.ontrack = (e) => {
+//         console.log("ontrack fired!", e.streams);
+//         audio.srcObject = e.streams[0];
+//       };
+
+
+//       // 3. AIの音声を再生するための audio 要素をセット
+//       const audio = new Audio();
+//       audio.autoplay = true;
+//       audioRef.current = audio;
+//       pc.ontrack = (e) => {
+//         audio.srcObject = e.streams[0];
+//       };
+
+//       // 4. マイクを追加
+//       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+//       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+//       // 5. SDP offer を作成して送信
+//       // const offer = await pc.createOffer();
+//       // await pc.setLocalDescription(offer);
+
+//       // const sdpRes = await fetch(
+//       //   "https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
+//       //   {
+//       //     method: "POST",
+//       //     headers: {
+//       //       Authorization: `Bearer ${ephemeralKey}`,
+//       //       "Content-Type": "application/sdp",
+//       //     },
+//       //     body: offer.sdp,
+//       //   }
+//       // );
+//       // offer作成
+//       const offer = await pc.createOffer();
+//       await pc.setLocalDescription(offer);
+//       console.log("Local SDP:", offer.sdp); // ← 追加
+
+//       // ICE gatheringが完了するまで待つ
+//       await new Promise<void>((resolve) => {
+//         if (pc.iceGatheringState === "complete") {
+//           resolve();
+//         } else {
+//           pc.onicegatheringstatechange = () => {
+//             console.log("ICE gathering state:", pc.iceGatheringState);
+//             if (pc.iceGatheringState === "complete") resolve();
+//           };
+//         }
+//       });
+
+//         // gathering完了後のSDPを送る
+//         const sdpRes = await fetch(
+//           "https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
+//           {
+//             method: "POST",
+//             headers: {
+//               Authorization: `Bearer ${ephemeralKey}`,
+//               "Content-Type": "application/sdp",
+//             },
+//             body: pc.localDescription!.sdp, // ← gatheringが完了したSDPを使う
+//           }
+//         );
+
+//       if (!sdpRes.ok) throw new Error("SDP exchange failed");
+
+//       // 6. answer をセット → WebRTC確立
+//       const answerSdp = await sdpRes.text();
+//       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+
+//       setInCall(true);
+//     } catch (err) {
+//       console.error("startCall error:", err);
+//     }
+//   };
+
+//   const stopCall = () => {
+//     pcRef.current?.getSenders().forEach((s) => s.track?.stop());
+//     pcRef.current?.close();
+//     pcRef.current = null;
+//     if (audioRef.current) {
+//       audioRef.current.srcObject = null;
+//     }
+//     setInCall(false);
+//   };
+
+//   const toggleCall = () => (inCall ? stopCall() : startCall());
+
+//   return (
+//     <button
+//       onClick={toggleCall}
+//       className={`w-24 h-24 flex items-center justify-center rounded-full shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-offset-2 ${
+//         inCall
+//           ? "bg-red-600 hover:bg-red-700 focus:ring-red-400"
+//           : "bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-400"
+//       }`}
+//     >
+//       {inCall ? (
+//         <PhoneOff className="h-10 w-10 text-white" />
+//       ) : (
+//         <Mic className="h-10 w-10 text-white" />
+//       )}
+//     </button>
+//   );
+// }
