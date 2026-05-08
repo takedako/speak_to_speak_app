@@ -16,15 +16,12 @@ export async function POST() {
   });
 
   const text = await res.text();
-  console.log("OpenAI response:", text);
 
   if (!res.ok) {
     return new Response(text, { status: 500 });
   }
 
   const data = JSON.parse(text);
-
-  console.log(data)
 
   if (!res.ok) {
     return Response.json({ error: data }, { status: 500 });
